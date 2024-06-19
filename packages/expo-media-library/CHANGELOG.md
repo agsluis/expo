@@ -6,6 +6,8 @@
 
 ### 🎉 New features
 
+- On `Android 14+`, when user gave only partial asset access, `presentPermissionsPickerAsync()` will present the permissions dialog to allow the user to change the selected assets.
+
 ### 🐛 Bug fixes
 
 - On `iOS`, add back image loader to handle `ph://` and `assets-library://` schemes. ([#29747](https://github.com/expo/expo/pull/29747) by [@alanjhughes](https://github.com/alanjhughes))
