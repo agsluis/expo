@@ -1,31 +1,107 @@
 ---
-title: Set up your environment
-description: Learn how to set up your development environment to start building with Expo.
-hideTOC: true
+npx react-native init DeliveryApp
+cd DeliveryApp
 ---
 
-import { PlatformAndDeviceForm } from '~/scenes/get-started/set-up-your-environment/PlatformAndDeviceForm';
-import { DevelopmentModeForm } from '~/scenes/get-started/set-up-your-environment/DevelopmentModeForm';
-import { DevelopmentEnvironmentInstructions } from '~/scenes/get-started/set-up-your-environment/DevelopmentEnvironmentInstructions';
+npm install @react-navigation/native react-native-maps socket.io-client
+mkdir server
+cd server
+npm init -y
+npm install express mongoose socket.io cors
+// server/index.js
+const express = require('express');
+const http = require('http');
+const socketIo = require('socket.io');
+const mongoose = require('mongoose');
+const cors = require('cors');
 
-Let's set up a local development environment for running your project on Android and iOS.
+const app = express();
+const server = http.createServer(app);
+const io = socketIo(server);
 
-## Where would you like to develop?
+app.use(cors());
+app.use(express.json());
 
-We recommend using a real device to develop, since you'll get to see exactly what your users will see.
+mongoose.connect('mongodb://localhost/deliveryapp', { useNewUrlParser: true, useUnifiedTopology: true });
 
-<PlatformAndDeviceForm />
+const orderSchema = new mongoose.Schema({
+    address: String,
+    content: String,
+    amount: Number,
+    assignedTo: String,
+    status: String,
+});
 
-## How would you like to develop?
+const Order = mongoose.model('Order', orderSchema);
 
-Expo Go is a sandbox for trying out Expo quickly. A development build is a build of your own app that includes Expo's developer tools.
+io.on('connection', (socket) => {
+    console.log('New client connected');
 
-<DevelopmentModeForm />
+    socket.on('assignOrder', async (orderData) => {
+        const order = new Order(orderData);
+        await order.save();
+        io.emit('orderAssigned', order);
+    });
 
----
+    socket.on('sendLocation', (data) => {
+        io.emit('locationUpdate', data);
+    });
 
-<DevelopmentEnvironmentInstructions />
+    socket.on('disconnect', () => {
+        console.log('Client disconnected');
+    });
+});
 
-## Next step
+const PORT = process.env.PORT || 4000;
+server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+import React from 'react';
+import { NavigationContainer } from '@react-navigation/native';
+import { createStackNavigator } from '@react-navigation/stack';
+import PatronScreen from './PatronScreen';
+import EmpleadoScreen from './EmpleadoScreen';
 
-You have a project and a development environment. Now it's time to start developing.
+const Stack = createStackNavigator();
+
+const App = () => {
+    return (
+        <NavigationContainer>
+            <Stack.Navigator initialRouteName="Patron">
+                <Stack.Screen name="Patron" component={PatronScreen} />
+                <Stack.Screen name="Empleado" component={EmpleadoScreen} />
+            </Stack.Navigator>
+        </NavigationContainer>
+    );
+};
+
+export default App;
+import React, { useState } from 'react';
+import { View, Text, TextInput, Button } from 'react-native';
+import io from 'socket.io-client';
+
+const socket = io('http://localhost:4000');
+
+const PatronScreen = () => {
+    const [address, setAddress] = useState('');
+    const [content, setContent] = useState('');
+    const [amount, setAmount] = useState('');
+
+    const assignOrder = () => {
+        const orderData = { address, content, amount, assignedTo: 'employeeId', status: 'assigned' };
+        socket.emit('assignOrder', orderData);
+    };
+
+    return (
+        <View>
+            <Text>Dirección:</Text>
+            <TextInput value={address} onChangeText={setAddress} />
+            <Text>Contenido del Pedido:</Text>
+            <TextInput value={content} onChangeText={setContent} />
+            <Text>Monto a Cobrar:</Text>
+            <TextInput value={amount} onChangeText={setAmount} />
+            <Button title="Asignar Pedido" onPress={assignOrder} />
+        </View>
+    );
+};
+
+export default PatronScreen;
+
